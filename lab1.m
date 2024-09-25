@@ -409,39 +409,44 @@ while true
     plot(x, y, 'rx', 'MarkerSize', 10, 'LineWidth', 2);  
     
     % Draw a rectangle around the selected point to indicate the window
-    rectangle('Position', [x - neighborhood_size, y - neighborhood_size, ...
-               2*neighborhood_size, 2*neighborhood_size], 'EdgeColor', 'g', 'LineWidth', 1.5);
+    rectangle('Position', [x - neighborhood_size - 0.5, y - neighborhood_size - 0.5, ...
+               2*neighborhood_size + 1, 2*neighborhood_size + 1], 'EdgeColor', 'g', 'LineWidth', 1.5);
     
     % Update the plot immediately
     drawnow;
 end
 
-% Adjust for fftshift (centered frequencies)
-[rows, cols] = size(F_primate);
-center_x = cols / 2;
-center_y = rows / 2;
-
 % Initialize the filtered Fourier transform
-F_primate_filtered = fftshift(F_primate);  
+F_primate_filtered = fftshift(F_primate);  % Work with shifted Fourier transform directly
+
+% Get the number of rows and columns
+[rows, cols] = size(F_primate_filtered);
 
 % Zero out a 5x5 neighborhood around each selected point
 for i = 1:size(selected_points, 1)
-    x = round(selected_points(i, 1) - center_x);
-    y = round(selected_points(i, 2) - center_y);
-    
+    x = round(selected_points(i, 1));
+    y = round(selected_points(i, 2));
+
     % Ensure the indices are valid and within bounds
-    x = max(1, min(cols, x + center_x));
-    y = max(1, min(rows, y + center_y));
+    x = max(neighborhood_size + 1, min(cols - neighborhood_size, x));
+    y = max(neighborhood_size + 1, min(rows - neighborhood_size, y));
     
     % Zero out a 5x5 neighborhood around the selected point
     F_primate_filtered(y-neighborhood_size:y+neighborhood_size, x-neighborhood_size:x+neighborhood_size) = 0;
 end
 
-% Shift back after modification
-F_primate_filtered = ifftshift(F_primate_filtered);
+% Visualize the modified power spectrum after zeroing out the selected areas
+S_primate_filtered = abs(F_primate_filtered).^2;  % Recompute the power spectrum after filtering
+S_primate_filtered_log = log(1 + S_primate_filtered);  % Apply logarithmic scaling for better visualization
+
+figure;
+imagesc(S_primate_filtered_log);  % Display the filtered power spectrum
+colormap('default');
+title('Filtered Power Spectrum (after removing selected areas)');
+colorbar;
 
 % Compute the inverse Fourier transform to get the filtered primate image
-primate_filtered_image = ifft2(F_primate_filtered);
+primate_filtered_image = ifft2(ifftshift(F_primate_filtered));  % Shift back and compute inverse Fourier transform
 
 % Take the real part and convert back to uint8
 primate_filtered_image = real(primate_filtered_image);
@@ -503,47 +508,20 @@ figure;
 imshow(P2);
 title('Warped Image (Frontal View of the Book)');
 
-% f) Dynamic color selection and matching in the warped image
-
-% Display the warped image and allow the user to select a region
-figure;
-imshow(P2);
-title('Select a region with the color to match');
-h = imrect;  % Allow the user to draw a rectangle over the region of interest
-position = wait(h);  % Wait for the user to finalize the rectangle
-
-% Get the selected region's coordinates
-x_min = round(position(1));
-y_min = round(position(2));
-width = round(position(3));
-height = round(position(4));
-
-% Crop the selected region from the image
-selected_region = imcrop(P2, [x_min, y_min, width, height]);
-
-% Convert the selected region to HSV and calculate the average HSV values
-selected_region_hsv = rgb2hsv(selected_region);
-avg_hue = mean(selected_region_hsv(:,:,1), 'all');
-avg_saturation = mean(selected_region_hsv(:,:,2), 'all');
-avg_value = mean(selected_region_hsv(:,:,3), 'all');
-
-% Define dynamic thresholds based on the selected color (adjust ranges as needed)
-hue_range = 0.05;  % Adjust the range around the hue
-sat_range = 0.2;   % Adjust the range around the saturation
-val_range = 0.2;   % Adjust the range around the value
-
-% Set thresholds for detecting the selected color in the entire image
-hue_min = max(0, avg_hue - hue_range);
-hue_max = min(1, avg_hue + hue_range);
-sat_min = max(0, avg_saturation - sat_range);
-sat_max = min(1, avg_saturation + sat_range);
-val_min = max(0, avg_value - val_range);
-val_max = min(1, avg_value + val_range);
+% f) Predefined color selection and matching in the warped image
 
 % Convert the entire image to HSV for color detection
 P2_hsv = rgb2hsv(P2);
 
-% Create a binary mask based on the dynamically set thresholds
+% Define the updated target color HSV range for reddish, pink, and orange hues
+hue_min = 0 / 360;   % Start from 0 degrees (red)
+hue_max = 25 / 360;  % Extend up to 25 degrees (covering reddish-orange)
+sat_min = 30 / 100;  % Allow lower saturation to capture light pinks and faded colors
+sat_max = 100 / 100; % Max saturation to capture vibrant colors
+val_min = 60 / 100;  % Allow darker values to include deeper reds
+val_max = 100 / 100; % Max brightness to capture light shades like pink or orange
+
+% Create a binary mask based on the updated color thresholds
 color_mask = (P2_hsv(:,:,1) >= hue_min) & (P2_hsv(:,:,1) <= hue_max) & ...
              (P2_hsv(:,:,2) >= sat_min) & (P2_hsv(:,:,2) <= sat_max) & ...
              (P2_hsv(:,:,3) >= val_min) & (P2_hsv(:,:,3) <= val_max);
@@ -568,10 +546,22 @@ if ~isempty(region_stats)
     figure;
     imshow(P2);
     title('Warped Image with Detected Color Region');
-
-    % Draw a rectangle around the detected color region
     hold on;
-    rectangle('Position', bounding_box, 'EdgeColor', 'g', 'LineWidth', 2);
+
+    % Draw a rectangle around the largest detected color region
+    rectangle('Position', bounding_box, 'EdgeColor', 'g', 'LineWidth', 2)
+
+    red_channel = ones(size(P2, 1), size(P2, 2));    % Red channel (all ones for full red)
+    green_channel = zeros(size(P2, 1), size(P2, 2));  % Green channel (all zeros)
+    blue_channel = ones(size(P2, 1), size(P2, 2));   % Blue channel (all ones for full blue)
+    
+    % Combine the channels into the final colored mask (purple mask)
+    colored_mask = cat(3, red_channel, green_channel, blue_channel);
+
+    % Apply the mask to the detected region with transparency
+    h_mask = imshow(colored_mask);
+    set(h_mask, 'AlphaData', 0.3 * color_mask_cleaned);  % Set transparency based on the mask (30% opacity)
+
     hold off;
 else
     disp('No matching color area detected in the image.');
