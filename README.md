@@ -53,11 +53,6 @@ Make sure the paths in the MATLAB script are correctly set up for the images in 
    - MATLAB with the **Image Processing Toolbox** installed. If the toolbox is not installed, you can install it via MATLAB's Add-On Explorer.
 
 2. **Steps**:
-   - Clone this repository to your local machine.
-     ```bash
-     git clone <repository_url>
-     ```
-   - Open MATLAB and navigate to the directory where the cloned repository is located.
    - Open the `lab1_code.m` script in MATLAB.
    - Ensure that all the image paths in the script are correct (they should point to the `images/` folder).
    - Run the script section by section to perform each experiment or run the entire script at once by typing:
@@ -100,16 +95,4 @@ The `lab1_report.pdf` contains a comprehensive explanation of the experiments, a
 - Ensure that the **Image Processing Toolbox** is installed before running the script.
 - Check that the images are correctly placed in the `images/` folder and the file paths in the MATLAB script are accurate.
 - If MATLAB throws an error regarding the toolbox, confirm that you have the required license and installation for the Image Processing Toolbox.
-
----
-
-## License
-
-This repository is for educational purposes related to the Computer Vision course. All code and images are provided as part of the lab work and are not intended for commercial use.
-
----
-
-## Acknowledgments
-
-This lab is part of the Computer Vision coursework (SC4061/CE4003/CZ4003), and all materials and experiments are aligned with the objectives of the course. The MATLAB code provided here builds upon concepts taught during lectures and the lab manual provided by the course instructor.
 
